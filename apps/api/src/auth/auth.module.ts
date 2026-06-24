@@ -6,7 +6,9 @@ import { OtpService } from './otp.service';
 import { TokenService } from './token.service';
 
 @Module({
-  imports: [JwtModule.register({})],
+  // global so the app-level JwtAuthGuard (APP_GUARD in AppModule) can resolve
+  // JwtService without re-importing JwtModule there.
+  imports: [JwtModule.register({ global: true })],
   controllers: [AuthController],
   providers: [AuthService, OtpService, TokenService],
   exports: [TokenService],

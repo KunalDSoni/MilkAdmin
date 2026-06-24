@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import { Logger, VersioningType } from '@nestjs/common';
 import helmet from 'helmet';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
@@ -13,9 +13,9 @@ async function bootstrap(): Promise<void> {
   app.enableCors({ origin: false }); // tighten to the real web/app origins per env
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
-  );
+  // Input validation is handled per-route by ZodValidationPipe (Zod is our
+  // single source of truth). z.object() strips unknown keys, preventing
+  // mass-assignment — so no class-validator-based global pipe is needed.
   app.enableShutdownHooks();
 
   const port = config.get<number>('API_PORT', 4000);

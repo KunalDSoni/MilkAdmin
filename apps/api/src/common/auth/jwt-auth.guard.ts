@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  SetMetadata,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -11,8 +12,7 @@ import { JwtPayload } from '@moderns-milk/contracts';
 import { AuthenticatedUser } from './current-user.decorator';
 
 export const IS_PUBLIC_KEY = 'isPublic';
-export const Public = () =>
-  Reflect.metadata(IS_PUBLIC_KEY, true) as MethodDecorator & ClassDecorator;
+export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
