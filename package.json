@@ -1,0 +1,30 @@
+{
+  "name": "moderns-milk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Moderns Milk — Dairy Distribution & Ordering Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "npm run db:generate -w @moderns-milk/database",
+    "db:migrate": "npm run db:migrate -w @moderns-milk/database",
+    "db:seed": "npm run db:seed -w @moderns-milk/database",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.log
+
+# env / secrets — never commit
+.env
+.env.local
+.env.*.local
+*.pem
+
+# prisma
+packages/database/prisma/*.db
+
+# os
+.DS_Store
+
+# docker volumes (local)
+.volumes/

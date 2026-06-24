@@ -1,0 +1,331 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@moderns-milk/database';
+import {
+  CreateOrderInput,
+  ReviewOrderInput,
+} from '@moderns-milk/contracts';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
+import { AuthenticatedUser } from '../common/auth/current-user.decorator';
+import {
+  canAccessDistributorResource,
+  canAccessRetailerResource,
+} from '../common/authz/scope';
+import { assertTransition } from './domain/order-state-machine';
+import { isWindowOpen } from './domain/cutoff';
+import { evaluateApproval } from './domain/auto-approval';
+
+const Decimal = Prisma.Decimal;
+type Decimal = Prisma.Decimal;
+
+const APPROVAL_TOLERANCE = 0.2; // +20% over standing baseline before manual review
+
+@Injectable()
+export class OrderingService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
+
+  // -- pricing ---------------------------------------------------------------
+
+  private async retailPriceMap(
+    productIds: string[],
+  ): Promise<Map<string, { price: Decimal; taxRate: Decimal }>> {
+    const now = new Date();
+    const priceList = await this.prisma.priceList.findFirst({
+      where: {
+        customerTier: 'RETAILER',
+        validFrom: { lte: now },
+        OR: [{ validTo: null }, { validTo: { gte: now } }],
+      },
+      orderBy: { validFrom: 'desc' },
+      include: {
+        items: { where: { productId: { in: productIds } }, include: { product: true } },
+      },
+    });
+    if (!priceList) {
+      throw new BadRequestException('No active retail price list configured');
+    }
+    const map = new Map<string, { price: Decimal; taxRate: Decimal }>();
+    for (const item of priceList.items) {
+      map.set(item.productId, {
+        price: item.price,
+        taxRate: item.product.taxRate,
+      });
+    }
+    return map;
+  }
+
+  // -- create ----------------------------------------------------------------
+
+  async createOrder(user: AuthenticatedUser, input: CreateOrderInput) {
+    if (!user.retailerId) {
+      throw new ForbiddenException('Only retailers can place orders');
+    }
+
+    const window = await this.prisma.orderWindow.findUnique({
+      where: { id: input.orderWindowId },
+    });
+    if (!window) throw new NotFoundException('Order window not found');
+
+    const retailer = await this.prisma.retailer.findUnique({
+      where: { id: user.retailerId },
+    });
+    if (!retailer) throw new NotFoundException('Retailer not found');
+
+    // Window must belong to the retailer's distributor (scope) and be open.
+    if (window.distributorId !== retailer.distributorId) {
+      throw new ForbiddenException('Window does not belong to your distributor');
+    }
+    if (!isWindowOpen(window, new Date())) {
+      throw new BadRequestException('Order window is closed (cutoff passed)');
+    }
+
+    const productIds = input.items.map((i) => i.productId);
+    if (new Set(productIds).size !== productIds.length) {
+      throw new BadRequestException('Duplicate products in order');
+    }
+    const prices = await this.retailPriceMap(productIds);
+
+    let subtotal = new Decimal(0);
+    let taxTotal = new Decimal(0);
+    const itemRows = input.items.map((i) => {
+      const priced = prices.get(i.productId);
+      if (!priced) {
+        throw new BadRequestException(`No price for product ${i.productId}`);
+      }
+      const qty = new Decimal(i.qty);
+      const lineNet = priced.price.mul(qty);
+      const lineTax = lineNet.mul(priced.taxRate).div(100);
+      subtotal = subtotal.add(lineNet);
+      taxTotal = taxTotal.add(lineTax);
+      return {
+        productId: i.productId,
+        unitPrice: priced.price,
+        qtyOrdered: qty,
+      };
+    });
+
+    const order = await this.prisma.order.create({
+      data: {
+        retailerId: retailer.id,
+        distributorId: retailer.distributorId,
+        orderWindowId: window.id,
+        deliveryDate: window.deliveryDate,
+        status: 'DRAFT',
+        source: 'MANUAL',
+        subtotal,
+        taxTotal,
+        total: subtotal.add(taxTotal),
+        items: { create: itemRows },
+      },
+      include: { items: true },
+    });
+    return order;
+  }
+
+  // -- submit (with exception-based auto approval) ---------------------------
+
+  async submitOrder(user: AuthenticatedUser, orderId: string) {
+    const order = await this.loadOrderForActor(user, orderId);
+    if (user.role === 'RETAILER' && order.retailerId !== user.retailerId) {
+      throw new ForbiddenException('Not your order');
+    }
+    assertTransition(order.status, 'SUBMITTED');
+
+    const account = await this.prisma.retailerAccount.findUnique({
+      where: { retailerId: order.retailerId },
+    });
+    const standing = await this.prisma.standingOrder.findFirst({
+      where: { retailerId: order.retailerId, active: true },
+      include: { items: true },
+    });
+    const priorOrders = await this.prisma.order.count({
+      where: {
+        retailerId: order.retailerId,
+        id: { not: order.id },
+        status: { in: ['APPROVED', 'IN_PRODUCTION', 'DISPATCHED', 'DELIVERED', 'SETTLED'] },
+      },
+    });
+
+    const standingTotal = standing
+      ? await this.estimateStandingTotal(standing.items)
+      : null;
+    const standingSkus = new Set(standing?.items.map((i) => i.productId) ?? []);
+    const hasNewSku =
+      standingSkus.size > 0 &&
+      order.items.some((i) => !standingSkus.has(i.productId));
+
+    const decision = evaluateApproval({
+      orderTotal: order.total.toNumber(),
+      standingTotal,
+      tolerancePct: APPROVAL_TOLERANCE,
+      accountBalance: account?.balance.toNumber() ?? 0,
+      creditLimit: account?.creditLimit.toNumber() ?? 0,
+      isNewRetailer: priorOrders === 0,
+      hasNewSku,
+    });
+
+    return this.prisma.$transaction(async (tx) => {
+      // DRAFT -> SUBMITTED
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: 'SUBMITTED' },
+      });
+      await this.audit.record(
+        {
+          actorId: user.userId,
+          action: 'ORDER_SUBMITTED',
+          entity: 'Order',
+          entityId: order.id,
+          after: { status: 'SUBMITTED' },
+        },
+        tx,
+      );
+
+      if (decision.type === 'AUTO_APPROVE') {
+        const approved = await tx.order.update({
+          where: { id: order.id },
+          data: { status: 'APPROVED', approvalType: 'AUTO' },
+          include: { items: true },
+        });
+        // Copy ordered -> approved quantities.
+        for (const item of order.items) {
+          await tx.orderItem.update({
+            where: { id: item.id },
+            data: { qtyApproved: item.qtyOrdered },
+          });
+        }
+        await this.audit.record(
+          {
+            actorId: user.userId,
+            action: 'ORDER_AUTO_APPROVED',
+            entity: 'Order',
+            entityId: order.id,
+            after: { status: 'APPROVED', approvalType: 'AUTO' },
+          },
+          tx,
+        );
+        return { ...approved, reviewReasons: [] as string[] };
+      }
+
+      // Stays SUBMITTED awaiting manual review.
+      return {
+        ...order,
+        status: 'SUBMITTED' as const,
+        reviewReasons: decision.reasons,
+      };
+    });
+  }
+
+  // -- manual review ---------------------------------------------------------
+
+  async reviewOrder(user: AuthenticatedUser, input: ReviewOrderInput) {
+    const order = await this.loadOrderForActor(user, input.orderId);
+    if (!canAccessDistributorResource(user, order.distributorId)) {
+      throw new ForbiddenException('Out of scope');
+    }
+    if (order.status !== 'SUBMITTED') {
+      throw new BadRequestException('Only submitted orders can be reviewed');
+    }
+
+    const target = input.decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+    assertTransition(order.status, target);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: target,
+          approvalType: input.decision === 'APPROVE' ? 'MANUAL' : undefined,
+          approvedById: input.decision === 'APPROVE' ? user.userId : undefined,
+        },
+      });
+      if (input.decision === 'APPROVE') {
+        for (const item of order.items) {
+          await tx.orderItem.update({
+            where: { id: item.id },
+            data: { qtyApproved: item.qtyOrdered },
+          });
+        }
+      }
+      await this.audit.record(
+        {
+          actorId: user.userId,
+          action: input.decision === 'APPROVE' ? 'ORDER_APPROVED' : 'ORDER_REJECTED',
+          entity: 'Order',
+          entityId: order.id,
+          before: { status: order.status },
+          after: { status: target, reason: input.reason },
+        },
+        tx,
+      );
+      return tx.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: { items: true },
+      });
+    });
+  }
+
+  // -- reads -----------------------------------------------------------------
+
+  async getOrder(user: AuthenticatedUser, orderId: string) {
+    const order = await this.loadOrderForActor(user, orderId);
+    return order;
+  }
+
+  async listOrders(user: AuthenticatedUser) {
+    const where: Prisma.OrderWhereInput = {};
+    if (user.role === 'RETAILER') {
+      where.retailerId = user.retailerId;
+    } else if (user.role === 'SALES_OFFICER' || user.role === 'DISTRIBUTOR') {
+      where.distributorId = user.distributorId;
+    }
+    // ADMIN / SALES_HEAD: unrestricted.
+    return this.prisma.order.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { items: true },
+    });
+  }
+
+  // -- helpers ---------------------------------------------------------------
+
+  private async loadOrderForActor(user: AuthenticatedUser, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const allowed = canAccessRetailerResource(
+      user,
+      order.retailerId,
+      order.distributorId,
+    );
+    if (!allowed) throw new ForbiddenException('Out of scope');
+    return order;
+  }
+
+  private async estimateStandingTotal(
+    items: { productId: string; qty: Decimal }[],
+  ): Promise<number> {
+    const prices = await this.retailPriceMap(items.map((i) => i.productId));
+    let total = new Decimal(0);
+    for (const i of items) {
+      const priced = prices.get(i.productId);
+      if (!priced) continue;
+      const net = priced.price.mul(i.qty);
+      const tax = net.mul(priced.taxRate).div(100);
+      total = total.add(net).add(tax);
+    }
+    return total.toNumber();
+  }
+}

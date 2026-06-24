@@ -1,0 +1,380 @@
+// Moderns Milk — Prisma schema (Slice 1: Foundation + Ordering Core)
+//
+// Correctness rules baked in:
+//   * All money = Decimal(12,2); all quantities = Decimal(12,3). No floats.
+//   * LedgerEntry is append-only (no updates in app code).
+//   * AuditLog records every financial / approval / state transition.
+//   * Order / OrderItem indexed on deliveryDate for future range partitioning.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  SALES_HEAD
+  SALES_OFFICER
+  DISTRIBUTOR
+  RETAILER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum ProductCategory {
+  MILK
+  DAIRY
+}
+
+enum Uom {
+  LITRE
+  ML
+  KG
+  GRAM
+  PIECE
+  POUCH
+}
+
+enum OrderWindowStatus {
+  OPEN // accepting / editing orders
+  LOCKED // cutoff passed, frozen for production
+  DISPATCHED
+  CLOSED
+}
+
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  IN_PRODUCTION
+  DISPATCHED
+  DELIVERED
+  SETTLED
+  CANCELLED
+}
+
+enum OrderSource {
+  STANDING
+  MANUAL
+}
+
+enum ApprovalType {
+  AUTO
+  MANUAL
+}
+
+enum LedgerEntryType {
+  DEBIT // increases what the retailer owes
+  CREDIT // payment / adjustment reducing what they owe
+}
+
+enum ReturnReason {
+  SHORT_SUPPLY
+  DAMAGE
+  EXPIRY
+  REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Identity & org
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String     @id @default(cuid())
+  phone     String     @unique
+  name      String
+  email     String?    @unique
+  role      Role
+  status    UserStatus @default(ACTIVE)
+
+  // Staff (SALES_OFFICER / DISTRIBUTOR) may be scoped to a distributor.
+  // Used by the tenant-scope guard so a user can never read another org's data.
+  distributorId String?
+  distributor   Distributor? @relation("DistributorStaff", fields: [distributorId], references: [id])
+
+  retailer  Retailer?
+  auditLogs AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([distributorId])
+}
+
+model Distributor {
+  id     String     @id @default(cuid())
+  code   String     @unique
+  name   String
+  region String?
+  status UserStatus @default(ACTIVE)
+
+  staff     User[]    @relation("DistributorStaff")
+  retailers Retailer[]
+  routes    Route[]
+  orders    Order[]
+  windows   OrderWindow[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Route {
+  id            String      @id @default(cuid())
+  distributorId String
+  distributor   Distributor @relation(fields: [distributorId], references: [id])
+  name          String
+  sequence      Int         @default(0)
+
+  retailers Retailer[]
+  windows   OrderWindow[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([distributorId, name])
+  @@index([distributorId])
+}
+
+model Retailer {
+  id            String      @id @default(cuid())
+  userId        String      @unique
+  user          User        @relation(fields: [userId], references: [id])
+  distributorId String
+  distributor   Distributor @relation(fields: [distributorId], references: [id])
+  routeId       String?
+  route         Route?      @relation(fields: [routeId], references: [id])
+
+  shopName    String
+  gstin       String?
+  addressLine String?
+  lat         Float?
+  lng         Float?
+  status      UserStatus @default(ACTIVE)
+
+  account        RetailerAccount?
+  standingOrders StandingOrder[]
+  orders         Order[]
+  ledgerEntries  LedgerEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([distributorId, routeId])
+}
+
+// Append-derived balance lives here; truth is the LedgerEntry stream.
+model RetailerAccount {
+  id          String   @id @default(cuid())
+  retailerId  String   @unique
+  retailer    Retailer @relation(fields: [retailerId], references: [id])
+  balance     Decimal  @default(0) @db.Decimal(12, 2)
+  creditLimit Decimal  @default(0) @db.Decimal(12, 2)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Catalog & pricing
+// ---------------------------------------------------------------------------
+
+model Product {
+  id              String          @id @default(cuid())
+  sku             String          @unique
+  name            String
+  category        ProductCategory
+  uom             Uom
+  packSize        Decimal         @db.Decimal(12, 3) // e.g. 0.500 L, 1.000 L
+  hsnCode         String?
+  taxRate         Decimal         @default(0) @db.Decimal(5, 2) // GST %
+  isReturnablePack Boolean        @default(false)
+  shelfLifeDays   Int?
+  active          Boolean         @default(true)
+
+  priceItems         PriceListItem[]
+  standingOrderItems StandingOrderItem[]
+  orderItems         OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, active])
+}
+
+model PriceList {
+  id           String    @id @default(cuid())
+  name         String
+  customerTier String    @default("RETAILER") // RETAILER | DISTRIBUTOR
+  region       String?
+  validFrom    DateTime
+  validTo      DateTime?
+
+  items PriceListItem[]
+
+  createdAt DateTime @default(now())
+
+  @@index([customerTier, validFrom])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  price       Decimal   @db.Decimal(12, 2)
+
+  @@unique([priceListId, productId])
+  @@index([productId])
+}
+
+// ---------------------------------------------------------------------------
+// Ordering
+// ---------------------------------------------------------------------------
+
+// One window per distributor (optionally per route) per delivery date.
+// Orders auto-lock at cutoffAt so production gets a stable demand signal.
+model OrderWindow {
+  id            String            @id @default(cuid())
+  distributorId String
+  distributor   Distributor       @relation(fields: [distributorId], references: [id])
+  routeId       String?
+  route         Route?            @relation(fields: [routeId], references: [id])
+  deliveryDate  DateTime          @db.Date
+  cutoffAt      DateTime
+  status        OrderWindowStatus @default(OPEN)
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([distributorId, routeId, deliveryDate])
+  @@index([status, cutoffAt])
+}
+
+model StandingOrder {
+  id         String   @id @default(cuid())
+  retailerId String
+  retailer   Retailer @relation(fields: [retailerId], references: [id])
+  // 7-bit weekday mask, Monday = bit 0. 127 = every day.
+  weekdayMask Int     @default(127)
+  active      Boolean @default(true)
+
+  items StandingOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([retailerId, active])
+}
+
+model StandingOrderItem {
+  id              String        @id @default(cuid())
+  standingOrderId String
+  standingOrder   StandingOrder @relation(fields: [standingOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  qty             Decimal       @db.Decimal(12, 3)
+
+  @@unique([standingOrderId, productId])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  retailerId    String
+  retailer      Retailer    @relation(fields: [retailerId], references: [id])
+  distributorId String
+  distributor   Distributor @relation(fields: [distributorId], references: [id])
+  orderWindowId String
+  orderWindow   OrderWindow @relation(fields: [orderWindowId], references: [id])
+  deliveryDate  DateTime    @db.Date
+
+  status       OrderStatus   @default(DRAFT)
+  source       OrderSource   @default(MANUAL)
+  approvalType ApprovalType?
+  approvedById String?
+
+  subtotal Decimal @default(0) @db.Decimal(12, 2)
+  taxTotal Decimal @default(0) @db.Decimal(12, 2)
+  total    Decimal @default(0) @db.Decimal(12, 2)
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([retailerId, deliveryDate])
+  @@index([distributorId, deliveryDate])
+  @@index([orderWindowId, status])
+  @@index([deliveryDate]) // partition key candidate
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  unitPrice Decimal @db.Decimal(12, 2)
+
+  // Multi-stage quantities — ordered != dispatched != delivered != accepted.
+  qtyOrdered    Decimal       @db.Decimal(12, 3)
+  qtyApproved   Decimal?      @db.Decimal(12, 3)
+  qtyDispatched Decimal?      @db.Decimal(12, 3)
+  qtyDelivered  Decimal?      @db.Decimal(12, 3)
+  qtyReturned   Decimal       @default(0) @db.Decimal(12, 3)
+  returnReason  ReturnReason?
+
+  @@unique([orderId, productId])
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Ledger (append-only) & audit (schema only this slice; behavior in slice 2)
+// ---------------------------------------------------------------------------
+
+model LedgerEntry {
+  id           String          @id @default(cuid())
+  retailerId   String
+  retailer     Retailer        @relation(fields: [retailerId], references: [id])
+  type         LedgerEntryType
+  amount       Decimal         @db.Decimal(12, 2)
+  refType      String // ORDER | PAYMENT | ADJUSTMENT | DEPOSIT
+  refId        String?
+  balanceAfter Decimal         @db.Decimal(12, 2)
+  note         String?
+
+  createdAt DateTime @default(now())
+
+  @@index([retailerId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String // e.g. ORDER_APPROVED, PRICE_CHANGED, PAYMENT_RECORDED
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId, createdAt])
+}
