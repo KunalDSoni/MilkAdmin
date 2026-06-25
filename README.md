@@ -6,18 +6,24 @@ ordering core (see `docs/superpowers/specs/`).
 ## Stack
 
 - **Backend:** NestJS + Prisma + PostgreSQL + Redis
+- **Admin web:** Next.js (App Router) + TypeScript + shadcn/ui patterns
 - **Monorepo:** npm workspaces + Turborepo
 - **Validation/contracts:** Zod (shared `@moderns-milk/contracts`)
-- Web (Next.js) and mobile (Expo) apps land in later slices.
+- Mobile (Expo) app lands in a later slice.
 
 ## Layout
 
 ```
 apps/api              NestJS backend (auth, catalog, ordering)
+apps/web              Next.js admin console (see apps/web/README.md)
 packages/database     Prisma schema, client, seed
 packages/contracts    Zod schemas + shared types
 packages/config       shared tsconfig
 ```
+
+The admin console talks to the API through a same-origin proxy (`/bff/*` →
+`/api/v1/*`), so the backend's CORS policy is unchanged. See
+[`apps/web/README.md`](apps/web/README.md) to run it.
 
 ## Getting started
 

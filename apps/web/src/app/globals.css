@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — Moderns Milk Admin.
+ * Values mirror the product spec exactly, expressed as HSL triplets so
+ * Tailwind's `/opacity` modifier works (e.g. bg-primary/10).
+ *
+ *   Accent (actions)   #2563EB  -> --primary
+ *   Brand dark         #0F172A  -> --brand  (sidebar / dark surfaces)
+ *   Brand secondary    #1E293B  -> --brand-muted
+ *   Background         #F8FAFC  -> --background
+ *   Surface            #FFFFFF  -> --card / --popover
+ *   Border             #E2E8F0  -> --border / --input
+ *   Text primary       #0F172A  -> --foreground
+ *   Text secondary     #64748B  -> --muted-foreground
+ *   Success            #10B981  Warning #F59E0B  Error #EF4444
+ */
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222.2 47.4% 11.2%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160.1 84.1% 39.4%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 37.7 92.1% 50.2%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --brand: 222.2 47.4% 11.2%;
+    --brand-muted: 217.2 32.6% 17.5%;
+    --brand-foreground: 210 40% 98%;
+
+    --radius: 12px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variation-settings: 'opsz' 32;
+  }
+  /* Accessible focus ring for keyboard users across all interactive elements. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  .skeleton-shimmer::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full;
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      hsl(0 0% 100% / 0.6),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+  /* Hide scrollbars on horizontal chip rows while keeping scroll. */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
