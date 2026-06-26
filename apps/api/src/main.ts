@@ -10,7 +10,11 @@ async function bootstrap(): Promise<void> {
   const config = app.get(ConfigService);
 
   app.use(helmet());
-  app.enableCors({ origin: false }); // tighten to the real web/app origins per env
+  // Allow local dev clients (Expo web, admin web on localhost) to call the API.
+  // Bearer-token auth, so no cookies/credentials needed. Tighten per env in prod.
+  app.enableCors({
+    origin: [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/],
+  });
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   // Input validation is handled per-route by ZodValidationPipe (Zod is our
