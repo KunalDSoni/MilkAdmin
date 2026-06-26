@@ -62,25 +62,51 @@ export class OrderingService {
     return map;
   }
 
+  // -- acting actor ----------------------------------------------------------
+
+  /**
+   * Resolves who an order is placed for. A retailer orders as themselves. A
+   * distributor (the single-role model) orders on behalf of a retailer account
+   * within their own distributor — so the order still satisfies the schema's
+   * required retailerId while keeping distributor scope.
+   */
+  private async resolveOrderingActor(
+    user: AuthenticatedUser,
+  ): Promise<{ retailerId: string; distributorId: string }> {
+    if (user.retailerId) {
+      const retailer = await this.prisma.retailer.findUnique({
+        where: { id: user.retailerId },
+      });
+      if (!retailer) throw new NotFoundException('Retailer not found');
+      return { retailerId: retailer.id, distributorId: retailer.distributorId };
+    }
+    if (user.distributorId) {
+      const retailer = await this.prisma.retailer.findFirst({
+        where: { distributorId: user.distributorId, status: 'ACTIVE' },
+        orderBy: { id: 'asc' },
+      });
+      if (!retailer) {
+        throw new BadRequestException(
+          'No retailer account exists for this distributor',
+        );
+      }
+      return { retailerId: retailer.id, distributorId: user.distributorId };
+    }
+    throw new ForbiddenException('This account cannot place orders');
+  }
+
   // -- create ----------------------------------------------------------------
 
   async createOrder(user: AuthenticatedUser, input: CreateOrderInput) {
-    if (!user.retailerId) {
-      throw new ForbiddenException('Only retailers can place orders');
-    }
+    const { retailerId, distributorId } = await this.resolveOrderingActor(user);
 
     const window = await this.prisma.orderWindow.findUnique({
       where: { id: input.orderWindowId },
     });
     if (!window) throw new NotFoundException('Order window not found');
 
-    const retailer = await this.prisma.retailer.findUnique({
-      where: { id: user.retailerId },
-    });
-    if (!retailer) throw new NotFoundException('Retailer not found');
-
-    // Window must belong to the retailer's distributor (scope) and be open.
-    if (window.distributorId !== retailer.distributorId) {
+    // Window must belong to the actor's distributor (scope) and be open.
+    if (window.distributorId !== distributorId) {
       throw new ForbiddenException('Window does not belong to your distributor');
     }
     if (!isWindowOpen(window, new Date())) {
@@ -114,8 +140,8 @@ export class OrderingService {
 
     const order = await this.prisma.order.create({
       data: {
-        retailerId: retailer.id,
-        distributorId: retailer.distributorId,
+        retailerId,
+        distributorId,
         orderWindowId: window.id,
         deliveryDate: window.deliveryDate,
         status: 'DRAFT',
@@ -133,16 +159,10 @@ export class OrderingService {
   // -- current window --------------------------------------------------------
 
   async getCurrentWindow(user: AuthenticatedUser) {
-    if (!user.retailerId) {
-      throw new ForbiddenException('Only retailers have an order window');
-    }
-    const retailer = await this.prisma.retailer.findUnique({
-      where: { id: user.retailerId },
-    });
-    if (!retailer) throw new NotFoundException('Retailer not found');
+    const { distributorId } = await this.resolveOrderingActor(user);
 
     const windows = await this.prisma.orderWindow.findMany({
-      where: { distributorId: retailer.distributorId, status: 'OPEN' },
+      where: { distributorId, status: 'OPEN' },
       orderBy: { deliveryDate: 'asc' },
     });
     const open = pickOpenWindow(windows, new Date());

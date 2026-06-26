@@ -24,7 +24,7 @@ export class OrderingController {
   constructor(private readonly ordering: OrderingService) {}
 
   @Post()
-  @Roles('RETAILER')
+  @Roles('DISTRIBUTOR', 'RETAILER')
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(createOrderSchema)) body: CreateOrderInput,
@@ -33,7 +33,7 @@ export class OrderingController {
   }
 
   @Post(':id/submit')
-  @Roles('RETAILER')
+  @Roles('DISTRIBUTOR', 'RETAILER')
   submit(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -57,7 +57,7 @@ export class OrderingController {
 
   // Must be declared before the `:id` route so it is not shadowed by it.
   @Get('windows/current')
-  @Roles('RETAILER')
+  @Roles('DISTRIBUTOR', 'RETAILER')
   currentWindow(@CurrentUser() user: AuthenticatedUser) {
     return this.ordering.getCurrentWindow(user);
   }
