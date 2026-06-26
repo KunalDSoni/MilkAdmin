@@ -17,7 +17,9 @@ export default function LoginPage() {
   const router = useRouter();
   const { verifyOtp, isAuthenticated, ready } = useAuth();
   const [step, setStep] = React.useState<Step>('phone');
-  const [phone, setPhone] = React.useState('+91');
+  // The +91 country code is fixed; the user only enters the 10-digit number.
+  const [digits, setDigits] = React.useState('');
+  const phone = `+91${digits}`;
   const [code, setCode] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
@@ -29,6 +31,10 @@ export default function LoginPage() {
   async function handleRequestOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (digits.length !== 10) {
+      setError('Enter a valid 10-digit mobile number');
+      return;
+    }
     const parsed = requestOtpSchema.safeParse({ phone });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Enter a valid phone number');
@@ -130,15 +136,22 @@ export default function LoginPage() {
             <form onSubmit={handleRequestOtp} className="mt-6 space-y-4" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone number</Label>
-                <Input
-                  id="phone"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  autoFocus
-                  placeholder="+9198XXXXXXXX"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/[^\d+]/g, ''))}
-                />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+                    +91
+                  </span>
+                  <Input
+                    id="phone"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    autoFocus
+                    maxLength={10}
+                    placeholder="98XXXXXXXX"
+                    className="pl-12"
+                    value={digits}
+                    onChange={(e) => setDigits(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  />
+                </div>
               </div>
               <Button type="submit" className="w-full" size="lg" loading={submitting}>
                 Send code <ArrowRight />
