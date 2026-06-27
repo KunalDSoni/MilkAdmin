@@ -216,8 +216,12 @@ export interface RetailerRow {
   outletName: string;
   contactName: string | null;
   phone: string | null;
+  whatsapp: string | null;
   route: string | null;
   distributor: string | null;
+  salesOfficer: string | null;
+  outletType: 'NEW' | 'EXISTING';
+  paymentTerms: string | null;
   gstin: string | null;
   address: string | null;
   status: string;

@@ -121,7 +121,7 @@ export default function RetailersPage() {
                   <TableHead>Contact</TableHead>
                   <TableHead>Route</TableHead>
                   <TableHead>Distributor</TableHead>
-                  <TableHead>GST</TableHead>
+                  <TableHead>Sales rep</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -139,7 +139,9 @@ export default function RetailersPage() {
                     <TableCell className="text-sm tabular-nums">{r.phone ?? '—'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{r.route ?? '—'}</TableCell>
                     <TableCell className="text-sm">{r.distributor ?? '—'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.gstin ?? '—'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {r.salesOfficer ?? '—'}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={r.status === 'ACTIVE' ? 'success' : 'muted'}>
                         {r.status}
