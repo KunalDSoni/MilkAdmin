@@ -197,7 +197,28 @@ export const api = {
     retailers: (signal?: AbortSignal) =>
       request<RetailerRow[]>('/admin/retailers', { signal }),
   },
+  salesVisits: {
+    list: (signal?: AbortSignal) =>
+      request<SalesVisitRow[]>('/sales-visits', { signal }),
+  },
 };
+
+export interface SalesVisitRow {
+  id: string;
+  date: string;
+  salesOfficer: string;
+  retailer: string;
+  route: string | null;
+  outletType: 'NEW' | 'EXISTING';
+  inTime: string | null;
+  bookingTime: string | null;
+  competition: string | null;
+  remarks: string | null;
+  itemCount: number;
+  orderId: string | null;
+  orderTotal: string | null;
+  createdAt: string;
+}
 
 // --- Registry DTOs (company-wide directory) --------------------------------
 export interface DistributorRow {
