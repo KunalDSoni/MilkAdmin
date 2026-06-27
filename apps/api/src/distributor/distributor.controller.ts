@@ -18,13 +18,13 @@ export class DistributorController {
   constructor(private readonly distributor: DistributorService) {}
 
   @Get('me/profile')
-  @Roles('DISTRIBUTOR')
+  @Roles('DISTRIBUTOR', 'SALES_OFFICER')
   getProfile(@CurrentUser() user: AuthenticatedUser) {
     return this.distributor.getProfile(user);
   }
 
   @Patch('me/profile')
-  @Roles('DISTRIBUTOR')
+  @Roles('DISTRIBUTOR', 'SALES_OFFICER')
   updateProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(updateProfileSchema)) body: UpdateProfileInput,
@@ -33,19 +33,19 @@ export class DistributorController {
   }
 
   @Get('customers')
-  @Roles('DISTRIBUTOR')
+  @Roles('DISTRIBUTOR', 'SALES_OFFICER')
   listCustomers(@CurrentUser() user: AuthenticatedUser) {
     return this.distributor.listCustomers(user);
   }
 
   @Get('sales-team')
-  @Roles('DISTRIBUTOR')
+  @Roles('DISTRIBUTOR', 'SALES_OFFICER')
   listSalesTeam(@CurrentUser() user: AuthenticatedUser) {
     return this.distributor.listSalesTeam(user);
   }
 
   @Post('customers')
-  @Roles('DISTRIBUTOR')
+  @Roles('DISTRIBUTOR', 'SALES_OFFICER')
   createCustomer(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(createCustomerSchema)) body: CreateCustomerInput,

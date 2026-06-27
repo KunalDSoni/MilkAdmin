@@ -156,6 +156,67 @@ export class OrderingService {
     return order;
   }
 
+  /**
+   * Create a fulfillment order for a specific retailer (used by sales-visit
+   * booking). Best-effort: returns null when there is no open window so the
+   * visit can still be recorded. Reuses retail pricing.
+   */
+  async createOrderForRetailer(
+    retailerId: string,
+    items: { productId: string; qty: string }[],
+  ): Promise<{ id: string; total: Decimal } | null> {
+    if (items.length === 0) return null;
+
+    const retailer = await this.prisma.retailer.findUnique({
+      where: { id: retailerId },
+    });
+    if (!retailer) throw new NotFoundException('Retailer not found');
+
+    const windows = await this.prisma.orderWindow.findMany({
+      where: { distributorId: retailer.distributorId, status: 'OPEN' },
+      orderBy: { deliveryDate: 'asc' },
+    });
+    const window = pickOpenWindow(windows, new Date());
+    if (!window) return null;
+
+    const productIds = items.map((i) => i.productId);
+    if (new Set(productIds).size !== productIds.length) {
+      throw new BadRequestException('Duplicate products in order');
+    }
+    const prices = await this.retailPriceMap(productIds);
+
+    let subtotal = new Decimal(0);
+    let taxTotal = new Decimal(0);
+    const itemRows = items.map((i) => {
+      const priced = prices.get(i.productId);
+      if (!priced) {
+        throw new BadRequestException(`No price for product ${i.productId}`);
+      }
+      const qty = new Decimal(i.qty);
+      const lineNet = priced.price.mul(qty);
+      const lineTax = lineNet.mul(priced.taxRate).div(100);
+      subtotal = subtotal.add(lineNet);
+      taxTotal = taxTotal.add(lineTax);
+      return { productId: i.productId, unitPrice: priced.price, qtyOrdered: qty };
+    });
+
+    const order = await this.prisma.order.create({
+      data: {
+        retailerId: retailer.id,
+        distributorId: retailer.distributorId,
+        orderWindowId: window.id,
+        deliveryDate: window.deliveryDate,
+        status: 'DRAFT',
+        source: 'MANUAL',
+        subtotal,
+        taxTotal,
+        total: subtotal.add(taxTotal),
+        items: { create: itemRows },
+      },
+    });
+    return { id: order.id, total: order.total };
+  }
+
   // -- current window --------------------------------------------------------
 
   async getCurrentWindow(user: AuthenticatedUser) {
