@@ -1,32 +1,35 @@
-import type { AuthTokens } from '@moderns-milk/contracts';
-
 /**
- * Token storage. Access + refresh tokens live in localStorage so the session
- * survives reloads; an in-memory mirror avoids redundant reads on hot paths.
- * The server remains the source of truth for authorization — these are only
- * carried as a Bearer credential.
+ * Token storage. Only the short-lived access token is kept (localStorage, with
+ * an in-memory mirror). The long-lived refresh token is NEVER stored in JS —
+ * it lives in an httpOnly cookie the server sets, so an XSS cannot exfiltrate
+ * it. On reload the access token is restored; once it expires, /auth/refresh
+ * mints a new one using the cookie.
  */
 const STORAGE_KEY = 'mm.auth.tokens';
 
-let cache: AuthTokens | null = null;
+interface StoredTokens {
+  accessToken: string;
+}
 
-export function getTokens(): AuthTokens | null {
+let cache: StoredTokens | null = null;
+
+export function getTokens(): StoredTokens | null {
   if (cache) return cache;
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
-    cache = JSON.parse(raw) as AuthTokens;
+    cache = JSON.parse(raw) as StoredTokens;
     return cache;
   } catch {
     return null;
   }
 }
 
-export function setTokens(tokens: AuthTokens): void {
-  cache = tokens;
+export function setTokens(tokens: { accessToken: string }): void {
+  cache = { accessToken: tokens.accessToken };
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
   }
 }
 
