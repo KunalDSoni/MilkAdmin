@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Moderns Milk — Dairy Distribution & Ordering Platform",
+  "packageManager": "npm@10.9.2",
   "workspaces": [
     "apps/*",
     "packages/*"

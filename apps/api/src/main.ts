@@ -22,8 +22,12 @@ async function bootstrap(): Promise<void> {
   // mass-assignment — so no class-validator-based global pipe is needed.
   app.enableShutdownHooks();
 
-  const port = config.get<number>('API_PORT', 4000);
-  await app.listen(port);
+  // Honour the platform-injected PORT first (Render, Cloud Run, Heroku, Fly all
+  // route to it); fall back to API_PORT for local/Docker, then 4000.
+  const port = process.env.PORT
+    ? Number(process.env.PORT)
+    : config.get<number>('API_PORT', 4000);
+  await app.listen(port, '0.0.0.0');
   new Logger('Bootstrap').log(`Moderns Milk API listening on :${port}`);
 }
 
