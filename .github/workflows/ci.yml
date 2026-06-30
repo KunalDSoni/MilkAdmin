@@ -24,7 +24,7 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        run: npm ci --no-audit
 
       # Prisma client must be generated before typecheck so enums
       # (Role, ProductCategory, Uom etc.) exist in @prisma/client.
@@ -53,7 +53,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --no-audit
       # Only fail on critical advisories. High-severity findings in multer
       # (NestJS) and postcss (Next.js) have no non-breaking fix available yet.
       - name: npm audit (critical only)
