@@ -83,13 +83,13 @@ function safeJson(text: string): unknown {
 let refreshing: Promise<AuthTokens | null> | null = null;
 
 async function tryRefresh(): Promise<AuthTokens | null> {
-  const tokens = getTokens();
-  if (!tokens?.refreshToken) return null;
+  // The refresh token is an httpOnly cookie sent automatically (same-origin
+  // /bff). No body needed; a missing/invalid cookie simply yields a 401.
   if (!refreshing) {
     refreshing = rawRequest<AuthTokens>('/auth/refresh', {
       method: 'POST',
       auth: false,
-      body: { refreshToken: tokens.refreshToken },
+      body: {},
     })
       .then((next) => {
         setTokens(next);

@@ -12,8 +12,11 @@ export const verifyOtpSchema = z.object({
 });
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 
+// refreshToken is optional: native clients send it in the body, while the web
+// sends it as an httpOnly cookie (read server-side). The controller requires
+// one source or the other.
 export const refreshSchema = z.object({
-  refreshToken: z.string().min(1),
+  refreshToken: z.string().min(1).optional(),
 });
 export type RefreshInput = z.infer<typeof refreshSchema>;
 
