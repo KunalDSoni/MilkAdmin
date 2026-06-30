@@ -1,0 +1,3 @@
+# Internal admin console — keep it out of search indexes.
+User-agent: *
+Disallow: /

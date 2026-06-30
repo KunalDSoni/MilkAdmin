@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+.git
+.github
+.volumes
+**/.env
+**/.env.*
+!**/.env.example
+*.log
+.DS_Store
+docs
