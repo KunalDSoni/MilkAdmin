@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: moderns-milk-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm install && npm run build -w @moderns-milk/contracts && npm run build -w @moderns-milk/database && npm run build -w @moderns-milk/api
+    startCommand: node apps/api/dist/main.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: 4000
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 900
+      - key: JWT_REFRESH_TTL
+        value: 2592000
+      - key: OTP_TTL
+        value: 300
+      - key: OTP_MAX_ATTEMPTS
+        value: 5
+      - key: OTP_RESEND_COOLDOWN
+        value: 60
+      - key: SMS_PROVIDER
+        value: console

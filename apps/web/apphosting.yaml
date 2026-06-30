@@ -1,0 +1,8 @@
+runConfig:
+  runtime: nodejs20
+
+env:
+  - variable: API_ORIGIN
+    availability:
+      - BUILD
+      - RUNTIME
