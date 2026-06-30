@@ -1,6 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --include=dev",
-  "buildCommand": "npx turbo run build --filter=@moderns-milk/web...",
-  "outputDirectory": "apps/web/.next"
+  "installCommand": "npm install --include=dev"
 }
