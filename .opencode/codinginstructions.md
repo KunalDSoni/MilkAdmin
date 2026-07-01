@@ -2,7 +2,7 @@
 
 ## Current State
 - **Branch**: `main` (pushed to `origin`)
-- **Last commit**: `HEAD` — `feat: Epic 2 field app features + standing orders admin`
+- **Last commit**: `HEAD` — `feat: Epic 3 admin polish`
 - **Working tree**: clean, nothing to commit
 
 ## What Was Completed
@@ -23,6 +23,13 @@
 - **Password login UI in MilkApp** — Login screen updated with OTP/Password toggle. `loginWithPassword` API and hook added. Mock mode password: `Moderns@2026`.
 - **Cutoff auto-lock cron job** — `CutoffSchedulerService` at `apps/api/src/ordering/cutoff-scheduler.service.ts` polls every 60s (configurable via `CUTOFF_POLL_MS` env var) with Redis lock for multi-instance safety. Registered in `OrderingModule`.
 
+### Epic 3 — Admin Polish (✅ Complete)
+- **Force logout user** — `POST /admin/users/:userId/force-logout` endpoint in `apps/api/src/admin/admin.controller.ts`. Force logout button (LogOut icon) on each row in the users table at `apps/web/src/app/(app)/users/page.tsx`. Uses `TokenService.revokeAll()` to invalidate all refresh tokens.
+- **Reconcile unlinked users** — `GET /admin/users/unlinked` lists SALES_OFFICER + DISTRIBUTOR users with no `distributorId`. `POST /admin/users/:userId/link` assigns them to a distributor & revokes tokens for re-login. Frontend `ReconcileDialog` at `apps/web/src/features/users/reconcile-dialog.tsx` shows list + distributor selector dropdown.
+- **Filters on list pages** — Distributors: region + status dropdowns. Payments: status + distributor + date range (native date inputs). Sales visits: outletType + date range (native date inputs). Backend extended with `dateFrom`/`dateTo` query params on `GET /payments` and `GET /sales-visits`, plus `outletType` on sales-visits.
+- **Distributor inline edit** — `PATCH /admin/distributors/:id` in admin controller/service. Frontend `DistributorEditDialog` at `apps/web/src/features/network/distributor-edit-dialog.tsx` with name/code/region/address/status fields, opened via Pencil icon on each row in the distributors page.
+- Admin module now imports `AuthModule` to access `TokenService`.
+
 ## Architecture
 - **Backend**: NestJS (port 4000) at `Milk Admin/apps/api/`
 - **Database**: PostgreSQL via Prisma, schema at `packages/database/prisma/schema.prisma`
@@ -32,34 +39,33 @@
   - Admin Web (Next.js) at `Milk Admin/apps/web/`
 - **Infra**: MinIO at localhost:9000 in docker-compose
 
-## What to Do Next (Epic 3 — Admin Polish)
-- Edit distributor/retailer records inline
-- Filters (status, area, date range) on list pages
-- Force logout user
-- Reconcile unlinked users
-- Dropdown selects for relation fields
-- Also: file upload UI in MilkApp, file upload UI in Admin Web
+## What to Do Next (Epic 4 — File Upload UX)
+- File upload UI in MilkApp (payment proof screenshots, profile photos)
+- File upload UI in Admin Web (payment verification, document upload)
+- Presigned URL handling for direct uploads from frontend
+- Retailer filters (status, date range, area) on admin retailers page
+- Bulk operations (export to CSV, batch status updates)
 
-## Relevant Files & Paths (Epic 2 additions)
+## Relevant Files & Paths (Epic 3 additions)
 | Area | Path |
 |------|------|
-| Payment schemas (MilkApp) | `MilkApp/src/features/payment/schemas.ts` |
-| Payment API (MilkApp) | `MilkApp/src/features/payment/api.ts` |
-| Payment hooks (MilkApp) | `MilkApp/src/features/payment/hooks.ts` |
-| Payment list screen | `MilkApp/src/app/(app)/payments/index.tsx` |
-| Payment create screen | `MilkApp/src/app/(app)/payments/new.tsx` |
-| Sales visit list screen | `MilkApp/src/app/(app)/sales-visits/index.tsx` |
-| Standing orders admin page | `Milk Admin/apps/web/src/app/(app)/standing-orders/page.tsx` |
-| Standing orders feature hook | `Milk Admin/apps/web/src/features/standing-orders/use-standing-orders.ts` |
-| Standing orders dialog | `Milk Admin/apps/web/src/features/standing-orders/standing-order-dialog.tsx` |
-| Standing orders API (web) | `Milk Admin/apps/web/src/lib/api.ts` (standingOrders section) |
-| Standing orders nav item | `Milk Admin/apps/web/src/lib/nav.ts` |
-| Cutoff scheduler | `Milk Admin/apps/api/src/ordering/cutoff-scheduler.service.ts` |
-| Login screen (password + OTP) | `MilkApp/src/app/(auth)/login.tsx` |
-| Auth hooks (password login) | `MilkApp/src/features/auth/hooks.ts` |
-| Auth API (password login) | `MilkApp/src/features/auth/api.ts` |
-| Dashboard quick actions | `MilkApp/src/app/(app)/(tabs)/index.tsx` |
-| App layout (routes) | `MilkApp/src/app/(app)/_layout.tsx` |
+| Force logout endpoint | `apps/api/src/admin/admin.controller.ts` (line ~35) |
+| Force logout service method | `apps/api/src/admin/admin.service.ts` `forceLogout()` |
+| Force logout button (users page) | `apps/web/src/app/(app)/users/page.tsx` |
+| Unlinked users endpoint | `apps/api/src/admin/admin.controller.ts` |
+| Unlinked users service method | `apps/api/src/admin/admin.service.ts` `listUnlinkedUsers()` |
+| Link user endpoint | `apps/api/src/admin/admin.controller.ts` |
+| Link user service method | `apps/api/src/admin/admin.service.ts` `linkUser()` |
+| Reconcile dialog | `apps/web/src/features/users/reconcile-dialog.tsx` |
+| Distributor edit endpoint | `apps/api/src/admin/admin.controller.ts` |
+| Distributor edit service method | `apps/api/src/admin/admin.service.ts` `updateDistributor()` |
+| Distributor edit dialog | `apps/web/src/features/network/distributor-edit-dialog.tsx` |
+| Payment filters (date range backend) | `apps/api/src/payment/payment.controller.ts` + `payment.service.ts` |
+| Sales visit filters (date, outletType backend) | `apps/api/src/sales-visit/sales-visit.controller.ts` + `sales-visit.service.ts` |
+| Distributor page filters | `apps/web/src/app/(app)/distributors/page.tsx` |
+| Payments page filters | `apps/web/src/app/(app)/payments/page.tsx` |
+| Sales visits page filters | `apps/web/src/app/(app)/sales-visits/page.tsx` |
+| Admin module imports AuthModule | `apps/api/src/admin/admin.module.ts` |
 
 ## Build & Run
 ```bash
@@ -81,3 +87,5 @@ All users have password `Moderns@2026` (bcrypt-hashed). Phone numbers in seed sc
 - Redis lock prefix `lock:cutoff-sweep` for multi-instance safety
 - Standing orders nav visible to ADMIN, SALES_HEAD, SALES_OFFICER, DISTRIBUTOR
 - Switch to `main` branch before starting new work
+- Force logout revokes ALL refresh tokens for that user via `TokenService.revokeAll()`
+- Linking a user to a distributor also revokes their tokens so JWT picks up new `distributorId`
