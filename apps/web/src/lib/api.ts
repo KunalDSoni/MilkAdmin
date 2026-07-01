@@ -156,6 +156,12 @@ export interface OrderDto {
   source: 'STANDING' | 'MANUAL';
   approvalType: 'AUTO' | 'MANUAL' | null;
   approvedById: string | null;
+  // Review metadata (spec §4.1.5).
+  approvedBy?: { name: string } | null;
+  rejectedById?: string | null;
+  rejectedBy?: { name: string } | null;
+  rejectReason?: string | null;
+  reviewedAt?: string | null;
   subtotal: string;
   taxTotal: string;
   total: string;

@@ -405,6 +405,9 @@ export class OrderingService {
           status: target,
           approvalType: input.decision === 'APPROVE' ? 'MANUAL' : undefined,
           approvedById: input.decision === 'APPROVE' ? user.userId : undefined,
+          rejectedById: input.decision === 'REJECT' ? user.userId : undefined,
+          rejectReason: input.decision === 'REJECT' ? input.reason ?? null : undefined,
+          reviewedAt: new Date(),
         },
       });
       if (input.decision === 'APPROVE') {
@@ -428,7 +431,11 @@ export class OrderingService {
       );
       return tx.order.findUniqueOrThrow({
         where: { id: order.id },
-        include: { items: true },
+        include: {
+          items: true,
+          approvedBy: { select: { name: true } },
+          rejectedBy: { select: { name: true } },
+        },
       });
     });
   }
@@ -517,6 +524,8 @@ export class OrderingService {
         retailer: {
           select: { shopName: true, user: { select: { name: true, phone: true } } },
         },
+        approvedBy: { select: { name: true } },
+        rejectedBy: { select: { name: true } },
       },
     });
   }
@@ -531,6 +540,8 @@ export class OrderingService {
         retailer: {
           select: { shopName: true, user: { select: { name: true, phone: true } } },
         },
+        approvedBy: { select: { name: true } },
+        rejectedBy: { select: { name: true } },
       },
     });
     if (!order) throw new NotFoundException('Order not found');
