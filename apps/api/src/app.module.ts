@@ -14,6 +14,7 @@ import { SalesVisitModule } from './sales-visit/sales-visit.module';
 import { StandingModule } from './standing/standing.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { SampleOrderModule } from './sample-order/sample-order.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -32,6 +33,7 @@ import { HealthController } from './health.controller';
     StandingModule,
     LedgerModule,
     OnboardingModule,
+    SampleOrderModule,
   ],
   controllers: [HealthController],
   providers: [

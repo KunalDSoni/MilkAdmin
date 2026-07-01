@@ -17,6 +17,8 @@ import type {
   OnboardRetailerInput,
   OnboardStaffInput,
   UpdateOnboardingInput,
+  SampleOrderDto,
+  CreateSampleOrderInput,
 } from '@moderns-milk/contracts';
 import { clearTokens, getTokens, setTokens } from './tokens';
 
@@ -244,6 +246,12 @@ export const api = {
   salesVisits: {
     list: (signal?: AbortSignal) =>
       request<SalesVisitRow[]>('/sales-visits', { signal }),
+  },
+  sampleOrders: {
+    list: (filters: { search?: string; date?: string } = {}, signal?: AbortSignal) =>
+      request<SampleOrderDto[]>(`/sample-orders${buildQuery(filters)}`, { signal }),
+    create: (input: CreateSampleOrderInput) =>
+      request<SampleOrderDto>('/sample-orders', { method: 'POST', body: input }),
   },
   ledger: {
     get: (retailerId: string, signal?: AbortSignal) =>

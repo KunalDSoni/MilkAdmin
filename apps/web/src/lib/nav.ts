@@ -6,6 +6,7 @@ import {
   Store,
   Route as RouteIcon,
   UsersRound,
+  Gift,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@moderns-milk/contracts';
@@ -36,6 +37,12 @@ export const NAV_SECTIONS: NavSection[] = [
     heading: 'Operations',
     items: [
       { label: 'Orders', href: '/orders', icon: ClipboardList },
+      {
+        label: 'Sample orders',
+        href: '/sample-orders',
+        icon: Gift,
+        roles: ['ADMIN', 'SALES_HEAD', 'SALES_OFFICER'],
+      },
       { label: 'Sales visits', href: '/sales-visits', icon: RouteIcon },
       { label: 'Products', href: '/products', icon: Package },
     ],
