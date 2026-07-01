@@ -7,6 +7,9 @@ export type ProductCategory = z.infer<typeof ProductCategory>;
 export const Uom = z.enum(['LITRE', 'ML', 'KG', 'GRAM', 'PIECE', 'POUCH']);
 export type Uom = z.infer<typeof Uom>;
 
+export const OrderUnit = z.enum(['CRATE', 'UNIT']);
+export type OrderUnit = z.infer<typeof OrderUnit>;
+
 export const productDtoSchema = z.object({
   id: z.string(),
   sku: z.string(),
@@ -19,6 +22,10 @@ export const productDtoSchema = z.object({
   shelfLifeDays: z.number().nullable(),
   isReturnablePack: z.boolean(),
   active: z.boolean(),
+  orderUnit: OrderUnit,
+  minOrderQty: z.string().nullable(),
+  maxOrderQty: z.string().nullable(),
+  unitPrice: z.string().nullable(),
 });
 export type ProductDto = z.infer<typeof productDtoSchema>;
 
@@ -29,28 +36,49 @@ export const listProductsQuerySchema = z.object({
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>;
 
 /** Create / edit payload for the admin catalog. Decimals travel as strings. */
-export const upsertProductSchema = z.object({
-  sku: z
-    .string()
-    .trim()
-    .min(1, 'SKU is required')
-    .max(40)
-    .transform((v) => v.toUpperCase()),
-  name: z.string().trim().min(1, 'Name is required').max(120),
-  category: ProductCategory,
-  uom: Uom,
-  packSize: decimalString.refine((v) => Number(v) > 0, 'Pack size must be greater than 0'),
-  taxRate: decimalString.refine(
-    (v) => Number(v) >= 0 && Number(v) <= 100,
-    'Tax rate must be between 0 and 100',
-  ),
-  hsnCode: z.string().trim().max(20).optional(),
-  shelfLifeDays: z.number().int().min(0).max(3650).optional(),
-  isReturnablePack: z.boolean().default(false),
-  active: z.boolean().default(true),
-});
+export const upsertProductSchema = z
+  .object({
+    sku: z
+      .string()
+      .trim()
+      .min(1, 'SKU is required')
+      .max(40)
+      .transform((v) => v.toUpperCase()),
+    name: z.string().trim().min(1, 'Name is required').max(120),
+    category: ProductCategory,
+    uom: Uom,
+    packSize: decimalString.refine((v) => Number(v) > 0, 'Pack size must be greater than 0'),
+    taxRate: decimalString.refine(
+      (v) => Number(v) >= 0 && Number(v) <= 100,
+      'Tax rate must be between 0 and 100',
+    ),
+    hsnCode: z.string().trim().max(20).optional(),
+    shelfLifeDays: z.number().int().min(0).max(3650).optional(),
+    isReturnablePack: z.boolean().default(false),
+    active: z.boolean().default(true),
+    // Ordering rules (spec §3.5.3).
+    orderUnit: OrderUnit.default('UNIT'),
+    minOrderQty: decimalString.optional(),
+    maxOrderQty: decimalString.optional(),
+    unitPrice: decimalString.optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (
+      val.minOrderQty !== undefined &&
+      val.maxOrderQty !== undefined &&
+      Number(val.maxOrderQty) < Number(val.minOrderQty)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['maxOrderQty'],
+        message: 'Maximum must be greater than or equal to minimum',
+      });
+    }
+  });
 export type UpsertProductInput = z.infer<typeof upsertProductSchema>;
 
 /** PATCH payload — any subset of the editable fields (e.g. just `active`). */
-export const updateProductSchema = upsertProductSchema.partial();
+export const updateProductSchema = upsertProductSchema
+  .innerType()
+  .partial();
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;

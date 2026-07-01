@@ -64,6 +64,13 @@ enum Uom {
   POUCH
 }
 
+// Ordering quantity type (spec §3.2.3) — a product is ordered by the crate or
+// by the individual unit, which sets the min/max the buyer may order.
+enum OrderUnit {
+  CRATE
+  UNIT
+}
+
 enum OrderWindowStatus {
   OPEN // accepting / editing orders
   LOCKED // cutoff passed, frozen for production
@@ -287,6 +294,13 @@ model Product {
   isReturnablePack Boolean         @default(false)
   shelfLifeDays    Int?
   active           Boolean         @default(true)
+
+  // Ordering rules (spec §3.5.3). orderUnit sets whether min/max is counted in
+  // crates or units; unitPrice is the price per that unit.
+  orderUnit   OrderUnit @default(UNIT)
+  minOrderQty Decimal?  @db.Decimal(12, 3)
+  maxOrderQty Decimal?  @db.Decimal(12, 3)
+  unitPrice   Decimal?  @db.Decimal(12, 2)
 
   priceItems         PriceListItem[]
   standingOrderItems StandingOrderItem[]
