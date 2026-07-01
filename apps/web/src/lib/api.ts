@@ -17,6 +17,14 @@ import type {
   OnboardRetailerInput,
   OnboardStaffInput,
   UpdateOnboardingInput,
+  SampleOrderDto,
+  CreateSampleOrderInput,
+  PaymentLogDto,
+  CreatePaymentInput,
+  UpdatePaymentStatusInput,
+  OrderSummaryDto,
+  OrderDeadlineDto,
+  OrderDeadlineInput,
 } from '@moderns-milk/contracts';
 import { clearTokens, getTokens, setTokens } from './tokens';
 
@@ -244,6 +252,30 @@ export const api = {
   salesVisits: {
     list: (signal?: AbortSignal) =>
       request<SalesVisitRow[]>('/sales-visits', { signal }),
+  },
+  sampleOrders: {
+    list: (filters: { search?: string; date?: string } = {}, signal?: AbortSignal) =>
+      request<SampleOrderDto[]>(`/sample-orders${buildQuery(filters)}`, { signal }),
+    create: (input: CreateSampleOrderInput) =>
+      request<SampleOrderDto>('/sample-orders', { method: 'POST', body: input }),
+  },
+  payments: {
+    list: (filters: { status?: string; distributorId?: string } = {}, signal?: AbortSignal) =>
+      request<PaymentLogDto[]>(`/payments${buildQuery(filters)}`, { signal }),
+    create: (input: CreatePaymentInput) =>
+      request<PaymentLogDto>('/payments', { method: 'POST', body: input }),
+    updateStatus: (id: string, input: UpdatePaymentStatusInput) =>
+      request<PaymentLogDto>(`/payments/${id}/status`, { method: 'PATCH', body: input }),
+  },
+  reports: {
+    orderSummary: (date: string | undefined, signal?: AbortSignal) =>
+      request<OrderSummaryDto>(`/reports/order-summary${buildQuery({ date })}`, { signal }),
+  },
+  settings: {
+    getOrderDeadline: (signal?: AbortSignal) =>
+      request<OrderDeadlineDto>('/settings/order-deadline', { signal }),
+    setOrderDeadline: (input: OrderDeadlineInput) =>
+      request<OrderDeadlineDto>('/settings/order-deadline', { method: 'PUT', body: input }),
   },
   ledger: {
     get: (retailerId: string, signal?: AbortSignal) =>

@@ -29,6 +29,8 @@ export class CatalogService {
   }
 
   async createProduct(input: UpsertProductInput): Promise<ProductDto> {
+    // Product name must be unique (spec §3.5.1) — case-insensitive.
+    await this.assertNameFree(input.name);
     try {
       const created = await this.prisma.product.create({
         data: {
@@ -42,6 +44,10 @@ export class CatalogService {
           shelfLifeDays: input.shelfLifeDays ?? null,
           isReturnablePack: input.isReturnablePack,
           active: input.active,
+          orderUnit: input.orderUnit,
+          minOrderQty: input.minOrderQty ?? null,
+          maxOrderQty: input.maxOrderQty ?? null,
+          unitPrice: input.unitPrice ?? null,
         },
       });
       return this.toDto(created);
@@ -50,10 +56,24 @@ export class CatalogService {
     }
   }
 
+  private async assertNameFree(name: string, exceptId?: string) {
+    const clash = await this.prisma.product.findFirst({
+      where: {
+        name: { equals: name, mode: 'insensitive' },
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (clash) {
+      throw new ConflictException('A product with this name already exists');
+    }
+  }
+
   async updateProduct(
     id: string,
     input: UpdateProductInput,
   ): Promise<ProductDto> {
+    if (input.name !== undefined) await this.assertNameFree(input.name, id);
     try {
       const updated = await this.prisma.product.update({
         where: { id },
@@ -69,6 +89,10 @@ export class CatalogService {
           shelfLifeDays: input.shelfLifeDays,
           isReturnablePack: input.isReturnablePack,
           active: input.active,
+          orderUnit: input.orderUnit,
+          minOrderQty: input.minOrderQty,
+          maxOrderQty: input.maxOrderQty,
+          unitPrice: input.unitPrice,
         },
       });
       return this.toDto(updated);
@@ -90,6 +114,10 @@ export class CatalogService {
       shelfLifeDays: p.shelfLifeDays,
       isReturnablePack: p.isReturnablePack,
       active: p.active,
+      orderUnit: p.orderUnit,
+      minOrderQty: p.minOrderQty?.toString() ?? null,
+      maxOrderQty: p.maxOrderQty?.toString() ?? null,
+      unitPrice: p.unitPrice?.toString() ?? null,
     };
   }
 

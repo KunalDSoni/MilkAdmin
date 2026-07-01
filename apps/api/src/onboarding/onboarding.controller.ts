@@ -11,6 +11,10 @@ import {
 } from '@moderns-milk/contracts';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { Roles } from '../common/auth/roles.decorator';
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from '../common/auth/current-user.decorator';
 import { OnboardingService } from './onboarding.service';
 
 /**
@@ -25,26 +29,38 @@ export class OnboardingController {
 
   @Get('distributors')
   @Roles('ADMIN', 'SALES_HEAD', 'SALES_OFFICER')
-  listDistributors(@Query('search') search?: string) {
-    return this.onboarding.listDistributors(search);
+  listDistributors(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('search') search?: string,
+  ) {
+    return this.onboarding.listDistributors(user, search);
   }
 
   @Get('retailers')
   @Roles('ADMIN', 'SALES_HEAD', 'SALES_OFFICER')
-  listRetailers(@Query('search') search?: string) {
-    return this.onboarding.listRetailers(search);
+  listRetailers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('search') search?: string,
+  ) {
+    return this.onboarding.listRetailers(user, search);
   }
 
   @Get('sales-heads')
   @Roles('ADMIN')
-  listSalesHeads(@Query('search') search?: string) {
-    return this.onboarding.listStaff('SALES_HEAD', search);
+  listSalesHeads(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('search') search?: string,
+  ) {
+    return this.onboarding.listStaff('SALES_HEAD', user, search);
   }
 
   @Get('sales-officers')
   @Roles('ADMIN', 'SALES_HEAD')
-  listSalesOfficers(@Query('search') search?: string) {
-    return this.onboarding.listStaff('SALES_OFFICER', search);
+  listSalesOfficers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('search') search?: string,
+  ) {
+    return this.onboarding.listStaff('SALES_OFFICER', user, search);
   }
 
   // -- create / onboard ------------------------------------------------------

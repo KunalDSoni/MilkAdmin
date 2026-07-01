@@ -47,6 +47,10 @@ interface FormState {
   shelfLifeDays: string;
   isReturnablePack: boolean;
   active: boolean;
+  orderUnit: 'CRATE' | 'UNIT';
+  minOrderQty: string;
+  maxOrderQty: string;
+  unitPrice: string;
 }
 
 function initialState(product?: ProductDto | null): FormState {
@@ -61,6 +65,10 @@ function initialState(product?: ProductDto | null): FormState {
     shelfLifeDays: product?.shelfLifeDays != null ? String(product.shelfLifeDays) : '',
     isReturnablePack: product?.isReturnablePack ?? false,
     active: product?.active ?? true,
+    orderUnit: product?.orderUnit ?? 'UNIT',
+    minOrderQty: product?.minOrderQty ?? '',
+    maxOrderQty: product?.maxOrderQty ?? '',
+    unitPrice: product?.unitPrice ?? '',
   };
 }
 
@@ -100,6 +108,10 @@ export function ProductFormDialog({ open, product, onClose }: ProductFormDialogP
       shelfLifeDays: form.shelfLifeDays.trim() ? Number(form.shelfLifeDays) : undefined,
       isReturnablePack: form.isReturnablePack,
       active: form.active,
+      orderUnit: form.orderUnit,
+      minOrderQty: form.minOrderQty.trim() || undefined,
+      maxOrderQty: form.maxOrderQty.trim() || undefined,
+      unitPrice: form.unitPrice.trim() || undefined,
     };
 
     const parsed = upsertProductSchema.safeParse(raw);
@@ -225,6 +237,45 @@ export function ProductFormDialog({ open, product, onClose }: ProductFormDialogP
               onChange={(e) => set('shelfLifeDays', e.target.value.replace(/[^\d]/g, ''))}
               inputMode="numeric"
               placeholder="e.g. 2"
+            />
+          </Field>
+
+          <Field label="Order by" error={errors.orderUnit}>
+            <Select value={form.orderUnit} onValueChange={(v) => set('orderUnit', v as FormState['orderUnit'])}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="UNIT">Unit</SelectItem>
+                <SelectItem value="CRATE">Crate</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label={`Price per ${form.orderUnit === 'CRATE' ? 'crate' : 'unit'} (optional)`} error={errors.unitPrice}>
+            <Input
+              value={form.unitPrice}
+              onChange={(e) => set('unitPrice', e.target.value.replace(/[^\d.]/g, ''))}
+              inputMode="decimal"
+              placeholder="0.00"
+            />
+          </Field>
+
+          <Field label="Min order qty (optional)" error={errors.minOrderQty}>
+            <Input
+              value={form.minOrderQty}
+              onChange={(e) => set('minOrderQty', e.target.value.replace(/[^\d.]/g, ''))}
+              inputMode="decimal"
+              placeholder="e.g. 1"
+            />
+          </Field>
+
+          <Field label="Max order qty (optional)" error={errors.maxOrderQty}>
+            <Input
+              value={form.maxOrderQty}
+              onChange={(e) => set('maxOrderQty', e.target.value.replace(/[^\d.]/g, ''))}
+              inputMode="decimal"
+              placeholder="e.g. 100"
             />
           </Field>
 

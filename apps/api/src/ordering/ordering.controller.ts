@@ -21,10 +21,14 @@ import {
 } from '../common/auth/current-user.decorator';
 import { Idempotent } from '../common/idempotency/idempotency.decorator';
 import { OrderingService } from './ordering.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Controller('orders')
 export class OrderingController {
-  constructor(private readonly ordering: OrderingService) {}
+  constructor(
+    private readonly ordering: OrderingService,
+    private readonly settings: SettingsService,
+  ) {}
 
   @Post()
   @Idempotent()
@@ -39,10 +43,12 @@ export class OrderingController {
   @Post(':id/submit')
   @Idempotent()
   @Roles('DISTRIBUTOR', 'RETAILER')
-  submit(
+  async submit(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
+    // Enforce the admin-set global order placement deadline (spec §8.2).
+    await this.settings.assertBeforeOrderDeadline();
     return this.ordering.submitOrder(user, id);
   }
 

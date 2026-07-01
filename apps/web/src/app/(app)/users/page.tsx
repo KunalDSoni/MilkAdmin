@@ -5,6 +5,7 @@ import { Plus, UsersRound } from 'lucide-react';
 import type { OnboardedUserRow } from '@moderns-milk/contracts';
 import { useOnboardedUsers, type UserTab } from '@/features/onboarding/use-onboarding';
 import { OnboardingFormDialog } from '@/features/onboarding/onboarding-form-dialog';
+import { useAuth } from '@/lib/auth-context';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,11 +23,15 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const TABS: { value: UserTab; label: string }[] = [
-  { value: 'distributors', label: 'Distributors' },
-  { value: 'retailers', label: 'Retailers' },
-  { value: 'sales-heads', label: 'Sales Heads' },
-  { value: 'sales-officers', label: 'Sales Officers' },
+import type { Role } from '@moderns-milk/contracts';
+
+// Which roles may see each tab (mirrors the API @Roles guards, so a user never
+// lands on a tab that would 403).
+const TAB_DEFS: { value: UserTab; label: string; roles: Role[] }[] = [
+  { value: 'distributors', label: 'Distributors', roles: ['ADMIN', 'SALES_HEAD', 'SALES_OFFICER'] },
+  { value: 'retailers', label: 'Retailers', roles: ['ADMIN', 'SALES_HEAD', 'SALES_OFFICER'] },
+  { value: 'sales-heads', label: 'Sales Heads', roles: ['ADMIN'] },
+  { value: 'sales-officers', label: 'Sales Officers', roles: ['ADMIN', 'SALES_HEAD'] },
 ];
 
 const ONBOARDING_VARIANT: Record<string, BadgeVariant> = {
@@ -45,9 +50,20 @@ function fmtDate(iso: string): string {
 }
 
 export default function UsersPage() {
+  const { role } = useAuth();
+  const tabs = React.useMemo(
+    () => TAB_DEFS.filter((t) => !role || t.roles.includes(role)),
+    [role],
+  );
   const [tab, setTab] = React.useState<UserTab>('distributors');
   const [search, setSearch] = React.useState('');
   const [formOpen, setFormOpen] = React.useState(false);
+
+  // Keep the active tab valid if the visible set changes with the role.
+  React.useEffect(() => {
+    const first = tabs[0];
+    if (first && !tabs.some((t) => t.value === tab)) setTab(first.value);
+  }, [tabs, tab]);
 
   return (
     <div className="space-y-6">
@@ -64,12 +80,12 @@ export default function UsersPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as UserTab)}>
         <TabsList>
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
           ))}
         </TabsList>
 
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <TabsContent key={t.value} value={t.value}>
             <Card>
               <div className="border-b border-border p-4">
