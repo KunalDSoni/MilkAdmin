@@ -8,6 +8,7 @@ import {
   UsersRound,
   Gift,
   Wallet,
+  FileSpreadsheet,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@moderns-milk/contracts';
@@ -45,6 +46,12 @@ export const NAV_SECTIONS: NavSection[] = [
         roles: ['ADMIN', 'SALES_HEAD', 'SALES_OFFICER'],
       },
       { label: 'Payment logs', href: '/payments', icon: Wallet },
+      {
+        label: 'Order summary',
+        href: '/reports/order-summary',
+        icon: FileSpreadsheet,
+        roles: ['ADMIN', 'SALES_HEAD'],
+      },
       { label: 'Sales visits', href: '/sales-visits', icon: RouteIcon },
       { label: 'Products', href: '/products', icon: Package },
     ],

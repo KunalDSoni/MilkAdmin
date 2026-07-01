@@ -22,6 +22,7 @@ import type {
   PaymentLogDto,
   CreatePaymentInput,
   UpdatePaymentStatusInput,
+  OrderSummaryDto,
 } from '@moderns-milk/contracts';
 import { clearTokens, getTokens, setTokens } from './tokens';
 
@@ -263,6 +264,10 @@ export const api = {
       request<PaymentLogDto>('/payments', { method: 'POST', body: input }),
     updateStatus: (id: string, input: UpdatePaymentStatusInput) =>
       request<PaymentLogDto>(`/payments/${id}/status`, { method: 'PATCH', body: input }),
+  },
+  reports: {
+    orderSummary: (date: string | undefined, signal?: AbortSignal) =>
+      request<OrderSummaryDto>(`/reports/order-summary${buildQuery({ date })}`, { signal }),
   },
   ledger: {
     get: (retailerId: string, signal?: AbortSignal) =>
