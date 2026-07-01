@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -44,6 +45,15 @@ export class FileController {
       mimeType: file.mimetype,
       size: result.size,
     };
+  }
+
+  @Post('presigned-upload')
+  @Roles('ADMIN', 'SALES_HEAD', 'SALES_OFFICER', 'DISTRIBUTOR')
+  @HttpCode(200)
+  async presignedUpload(@Body('originalName') originalName: string) {
+    if (!originalName) return { error: 'originalName is required' };
+    const result = await this.files.getPresignedUploadUrl(originalName);
+    return { key: result.key, url: result.url };
   }
 
   @Get(':key')

@@ -49,6 +49,14 @@ export class FileService implements OnModuleInit {
     }
   }
 
+  async getPresignedUploadUrl(originalName: string): Promise<{ key: string; url: string }> {
+    await this.ensureBucket();
+    const ext = extname(originalName) || '.bin';
+    const key = `${randomUUID()}${ext}`;
+    const url = await this.client.presignedPutObject(this.bucket, key, this.presignedExpiry);
+    return { key, url };
+  }
+
   async upload(
     buffer: Buffer,
     originalName: string,

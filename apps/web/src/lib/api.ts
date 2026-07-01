@@ -62,16 +62,18 @@ function messageFromBody(body: unknown, fallback: string): string {
 
 async function rawRequest<T>(path: string, opts: RequestOptions): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isFormData = opts.body instanceof FormData;
+  if (opts.body !== undefined && !isFormData) headers['Content-Type'] = 'application/json';
   if (opts.auth !== false) {
     const tokens = getTokens();
     if (tokens?.accessToken) headers.Authorization = `Bearer ${tokens.accessToken}`;
   }
 
+  const body = isFormData ? (opts.body as FormData) : opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
   const res = await fetch(`${BASE}${path}`, {
     method: opts.method ?? 'GET',
     headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    body,
     signal: opts.signal,
   });
 
@@ -247,6 +249,23 @@ export const api = {
         method: 'PATCH',
         body,
       }),
+  },
+  files: {
+    upload: (file: File, signal?: AbortSignal) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return request<{ key: string; url: string; originalName: string; mimeType: string; size: number }>(
+        '/files/upload',
+        { method: 'POST', body: formData, signal },
+      );
+    },
+    presignedUpload: (originalName: string) =>
+      request<{ key: string; url: string }>('/files/presigned-upload', {
+        method: 'POST',
+        body: { originalName },
+      }),
+    getUrl: (key: string) =>
+      request<string>(`/files/${key}`, {}),
   },
   retailers: {
     update: (id: string, input: UpdateCustomerInput) =>
