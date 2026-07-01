@@ -13,6 +13,7 @@ import {
 } from '@moderns-milk/contracts';
 import { Prisma } from '@moderns-milk/database';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuthenticatedUser } from '../common/auth/current-user.decorator';
 
 /**
  * User onboarding for HQ roles (spec §2.8–2.9). Admin / Sales Head / Sales
@@ -53,6 +54,7 @@ export class OnboardingService {
           securityDeposit: input.securityDeposit ?? null,
           onboardingStatus: input.onboardingStatus,
           onboardingNote: input.onboardingNote ?? null,
+          assignedSalesOfficerId: input.salesOfficerId ?? null,
           status: input.status,
         },
       });
@@ -157,12 +159,32 @@ export class OnboardingService {
 
   // -- listing ---------------------------------------------------------------
 
+  // Role-scoped WHERE fragments. ADMIN sees everything; a SALES_HEAD sees their
+  // officers' network; a SALES_OFFICER sees only what they manage (spec §2, SH/SO).
+  private distributorScope(user: AuthenticatedUser): Prisma.DistributorWhereInput {
+    if (user.role === 'SALES_OFFICER') return { assignedSalesOfficerId: user.userId };
+    if (user.role === 'SALES_HEAD')
+      return { assignedSalesOfficer: { reportsToId: user.userId } };
+    return {};
+  }
+
+  private retailerScope(user: AuthenticatedUser): Prisma.RetailerWhereInput {
+    if (user.role === 'SALES_OFFICER') return { salesOfficerId: user.userId };
+    if (user.role === 'SALES_HEAD')
+      return { salesOfficer: { reportsToId: user.userId } };
+    return {};
+  }
+
   /** Distributors with onboarding detail (spec §2.2). */
-  async listDistributors(search?: string): Promise<OnboardedUserRow[]> {
+  async listDistributors(
+    user: AuthenticatedUser,
+    search?: string,
+  ): Promise<OnboardedUserRow[]> {
     const rows = await this.prisma.distributor.findMany({
-      where: search
-        ? { OR: [{ name: { contains: search, mode: 'insensitive' } }] }
-        : {},
+      where: {
+        ...this.distributorScope(user),
+        ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: {
@@ -188,11 +210,15 @@ export class OnboardingService {
   }
 
   /** Retailers with onboarding detail (spec §2.3). */
-  async listRetailers(search?: string): Promise<OnboardedUserRow[]> {
+  async listRetailers(
+    user: AuthenticatedUser,
+    search?: string,
+  ): Promise<OnboardedUserRow[]> {
     const rows = await this.prisma.retailer.findMany({
-      where: search
-        ? { shopName: { contains: search, mode: 'insensitive' } }
-        : {},
+      where: {
+        ...this.retailerScope(user),
+        ...(search ? { shopName: { contains: search, mode: 'insensitive' } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: {
@@ -223,11 +249,18 @@ export class OnboardingService {
   /** Staff of a given role (spec §2.4 / §2.5). */
   async listStaff(
     role: 'SALES_HEAD' | 'SALES_OFFICER',
+    user: AuthenticatedUser,
     search?: string,
   ): Promise<OnboardedUserRow[]> {
+    // A SALES_HEAD only sees the officers reporting to them.
+    const scope: Prisma.UserWhereInput =
+      role === 'SALES_OFFICER' && user.role === 'SALES_HEAD'
+        ? { reportsToId: user.userId }
+        : {};
     const rows = await this.prisma.user.findMany({
       where: {
         role,
+        ...scope,
         ...(search
           ? {
               OR: [

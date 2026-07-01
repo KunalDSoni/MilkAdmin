@@ -76,6 +76,7 @@ export function OnboardingFormDialog({ open, tab, onClose }: Props) {
   // Reference data for dropdowns.
   const distributors = useOnboardedUsers('distributors', '');
   const salesHeads = useOnboardedUsers('sales-heads', '');
+  const salesOfficers = useOnboardedUsers('sales-officers', '');
 
   const [form, setForm] = React.useState<Record<string, string>>({});
   const [errors, setErrors] = React.useState<FieldErrors>({});
@@ -89,6 +90,20 @@ export function OnboardingFormDialog({ open, tab, onClose }: Props) {
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const pending = distMut.isPending || retMut.isPending || staffMut.isPending;
+
+  const salesOfficerSelect = (
+    <div className="space-y-1.5">
+      <Label>Assigned sales officer</Label>
+      <Select value={form.salesOfficerId ?? ''} onValueChange={(v) => set('salesOfficerId', v)}>
+        <SelectTrigger><SelectValue placeholder="Assign sales officer" /></SelectTrigger>
+        <SelectContent>
+          {(salesOfficers.data ?? []).map((o) => (
+            <SelectItem key={o.id} value={o.id}>{o.fullName}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   async function submit() {
     setErrors({});
@@ -218,6 +233,7 @@ export function OnboardingFormDialog({ open, tab, onClose }: Props) {
               {field('pan', 'PAN number')}
               {field('bankDetails', 'Bank details')}
               {field('securityDeposit', 'Security deposit', { type: 'text', placeholder: '0.00' })}
+              {salesOfficerSelect}
             </>
           )}
 
@@ -246,6 +262,7 @@ export function OnboardingFormDialog({ open, tab, onClose }: Props) {
               {field('shopLicenseNo', 'Shop license number')}
               {field('securityDeposit', 'Security deposit')}
               {field('instrumentNo', 'Instrument / cheque no.')}
+              {salesOfficerSelect}
             </>
           )}
 

@@ -132,10 +132,11 @@ model User {
   reportsTo   User?   @relation("StaffReporting", fields: [reportsToId], references: [id])
   reports     User[]  @relation("StaffReporting")
 
-  retailer            Retailer?
-  registeredRetailers Retailer[]   @relation("RetailerSalesOfficer")
-  salesVisits         SalesVisit[] @relation("VisitSalesOfficer")
-  auditLogs           AuditLog[]
+  retailer             Retailer?
+  registeredRetailers  Retailer[]    @relation("RetailerSalesOfficer")
+  assignedDistributors Distributor[] @relation("DistributorSalesOfficer")
+  salesVisits          SalesVisit[]  @relation("VisitSalesOfficer")
+  auditLogs            AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,6 +162,11 @@ model Distributor {
 
   onboardingStatus OnboardingStatus @default(PENDING)
   onboardingNote   String? // mandatory when REJECTED (enforced in service)
+
+  // Sales officer who manages this distributor. Drives role-scoped visibility
+  // (a SO sees their distributors; a SH sees their officers' distributors).
+  assignedSalesOfficerId String?
+  assignedSalesOfficer   User?   @relation("DistributorSalesOfficer", fields: [assignedSalesOfficerId], references: [id])
 
   staff       User[]        @relation("DistributorStaff")
   retailers   Retailer[]

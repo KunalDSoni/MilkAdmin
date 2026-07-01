@@ -47,7 +47,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'User management',
         href: '/users',
         icon: UsersRound,
-        roles: ['ADMIN', 'SALES_HEAD'],
+        roles: ['ADMIN', 'SALES_HEAD', 'SALES_OFFICER'],
       },
       {
         label: 'Distributors',
