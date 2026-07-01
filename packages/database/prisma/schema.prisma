@@ -137,6 +137,7 @@ model User {
   assignedDistributors Distributor[] @relation("DistributorSalesOfficer")
   salesVisits          SalesVisit[]  @relation("VisitSalesOfficer")
   sampleOrders         SampleOrder[] @relation("SampleOrderPlacedBy")
+  recordedPayments     PaymentLog[]  @relation("PaymentRecordedBy")
   auditLogs            AuditLog[]
 
   createdAt DateTime @default(now())
@@ -176,6 +177,7 @@ model Distributor {
   windows      OrderWindow[]
   salesVisits  SalesVisit[]
   sampleOrders SampleOrder[]
+  payments     PaymentLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -391,6 +393,7 @@ model Order {
 
   items      OrderItem[]
   salesVisit SalesVisit?
+  payments   PaymentLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -467,6 +470,52 @@ model SampleOrderItem {
 
   @@unique([sampleOrderId, productId])
   @@index([sampleOrderId])
+}
+
+// ---------------------------------------------------------------------------
+// Payment logs (spec §6) — money a distributor pays their sales officer.
+// Distributors record the payment (with a proof image); only an ADMIN may flip
+// the status PENDING -> PAID. Kept separate from the retailer LedgerEntry stream.
+// ---------------------------------------------------------------------------
+
+enum PaymentMode {
+  CASH
+  UPI
+  CHEQUE
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+model PaymentLog {
+  id String @id @default(cuid())
+
+  distributorId String
+  distributor   Distributor @relation(fields: [distributorId], references: [id])
+
+  // Optional link to the order this payment settles.
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  // Who logged it (typically the distributor's own user).
+  recordedById String
+  recordedBy   User   @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+
+  amount        Decimal       @db.Decimal(12, 2)
+  paymentDate   DateTime
+  mode          PaymentMode
+  status        PaymentStatus @default(PENDING)
+  proofImageKey String? // object-store key for the uploaded transaction proof
+  note          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([distributorId, createdAt])
+  @@index([status])
 }
 
 // Field-sales "beat" record — a rep's visit to an outlet. Captures the visit

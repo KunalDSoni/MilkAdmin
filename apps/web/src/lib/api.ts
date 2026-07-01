@@ -19,6 +19,9 @@ import type {
   UpdateOnboardingInput,
   SampleOrderDto,
   CreateSampleOrderInput,
+  PaymentLogDto,
+  CreatePaymentInput,
+  UpdatePaymentStatusInput,
 } from '@moderns-milk/contracts';
 import { clearTokens, getTokens, setTokens } from './tokens';
 
@@ -252,6 +255,14 @@ export const api = {
       request<SampleOrderDto[]>(`/sample-orders${buildQuery(filters)}`, { signal }),
     create: (input: CreateSampleOrderInput) =>
       request<SampleOrderDto>('/sample-orders', { method: 'POST', body: input }),
+  },
+  payments: {
+    list: (filters: { status?: string; distributorId?: string } = {}, signal?: AbortSignal) =>
+      request<PaymentLogDto[]>(`/payments${buildQuery(filters)}`, { signal }),
+    create: (input: CreatePaymentInput) =>
+      request<PaymentLogDto>('/payments', { method: 'POST', body: input }),
+    updateStatus: (id: string, input: UpdatePaymentStatusInput) =>
+      request<PaymentLogDto>(`/payments/${id}/status`, { method: 'PATCH', body: input }),
   },
   ledger: {
     get: (retailerId: string, signal?: AbortSignal) =>
