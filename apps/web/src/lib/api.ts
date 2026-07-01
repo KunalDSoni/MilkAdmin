@@ -233,6 +233,20 @@ export const api = {
       request<DistributorRow[]>('/admin/distributors', { signal }),
     retailers: (signal?: AbortSignal) =>
       request<RetailerRow[]>('/admin/retailers', { signal }),
+    forceLogout: (userId: string) =>
+      request<{ message: string }>(`/admin/users/${userId}/force-logout`, { method: 'POST' }),
+    unlinkedUsers: (signal?: AbortSignal) =>
+      request<UnlinkedUserRow[]>('/admin/users/unlinked', { signal }),
+    linkUser: (userId: string, distributorId: string) =>
+      request<{ message: string }>(`/admin/users/${userId}/link`, {
+        method: 'POST',
+        body: { distributorId },
+      }),
+    updateDistributor: (id: string, body: { name?: string; code?: string; region?: string; address?: string; status?: string }) =>
+      request<{ message: string }>(`/admin/distributors/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
   },
   retailers: {
     update: (id: string, input: UpdateCustomerInput) =>
@@ -259,8 +273,8 @@ export const api = {
       request<unknown>(`/onboarding/retailers/${id}/status`, { method: 'PATCH', body: input }),
   },
   salesVisits: {
-    list: (signal?: AbortSignal) =>
-      request<SalesVisitRow[]>('/sales-visits', { signal }),
+    list: (filters: { dateFrom?: string; dateTo?: string; outletType?: string } = {}, signal?: AbortSignal) =>
+      request<SalesVisitRow[]>(`/sales-visits${buildQuery(filters)}`, { signal }),
   },
   sampleOrders: {
     list: (filters: { search?: string; date?: string } = {}, signal?: AbortSignal) =>
@@ -269,7 +283,7 @@ export const api = {
       request<SampleOrderDto>('/sample-orders', { method: 'POST', body: input }),
   },
   payments: {
-    list: (filters: { status?: string; distributorId?: string } = {}, signal?: AbortSignal) =>
+    list: (filters: { status?: string; distributorId?: string; dateFrom?: string; dateTo?: string } = {}, signal?: AbortSignal) =>
       request<PaymentLogDto[]>(`/payments${buildQuery(filters)}`, { signal }),
     create: (input: CreatePaymentInput) =>
       request<PaymentLogDto>('/payments', { method: 'POST', body: input }),
@@ -361,5 +375,14 @@ export interface RetailerRow {
   balance: string;
   creditLimit: string;
   status: string;
+  createdAt: string;
+}
+
+export interface UnlinkedUserRow {
+  id: string;
+  name: string;
+  phone: string;
+  role: 'SALES_OFFICER' | 'DISTRIBUTOR';
+  area: string | null;
   createdAt: string;
 }
