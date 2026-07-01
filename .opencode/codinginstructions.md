@@ -2,7 +2,7 @@
 
 ## Current State
 - **Branch**: `main` (pushed to `origin`)
-- **Last commit**: `HEAD` — `feat: Epic 3 admin polish`
+- **Last commit**: `HEAD` — `feat: Epic 4 file upload UX + retailer filters`
 - **Working tree**: clean, nothing to commit
 
 ## What Was Completed
@@ -30,6 +30,12 @@
 - **Distributor inline edit** — `PATCH /admin/distributors/:id` in admin controller/service. Frontend `DistributorEditDialog` at `apps/web/src/features/network/distributor-edit-dialog.tsx` with name/code/region/address/status fields, opened via Pencil icon on each row in the distributors page.
 - Admin module now imports `AuthModule` to access `TokenService`.
 
+### Epic 4 — File Upload UX (✅ Complete)
+- **Presigned PUT endpoint** — `POST /files/presigned-upload` returns `{ key, url }` for direct browser-to-MinIO upload. `FileService.getPresignedUploadUrl()` generates a presigned `putObject` URL.
+- **Frontend API client** — `api.files.upload(file)` using FormData, `api.files.presignedUpload(originalName)`, `api.files.getUrl(key)` added to `api.ts`. `rawRequest()` now handles FormData bodies (skips JSON Content-Type).
+- **Payment proof file picker** — `PaymentDialog` now has a `<input type="file" accept="image/*">` that uploads to `/files/upload` and shows an image preview via the returned presigned URL. The manual text field for `proofImageKey` is replaced.
+- **Retailer filters** — Added status (Active/Inactive) dropdown + date range (from/to native date inputs) to the admin retailers page at `apps/web/src/app/(app)/retailers/page.tsx`.
+
 ## Architecture
 - **Backend**: NestJS (port 4000) at `Milk Admin/apps/api/`
 - **Database**: PostgreSQL via Prisma, schema at `packages/database/prisma/schema.prisma`
@@ -39,33 +45,26 @@
   - Admin Web (Next.js) at `Milk Admin/apps/web/`
 - **Infra**: MinIO at localhost:9000 in docker-compose
 
-## What to Do Next (Epic 4 — File Upload UX)
+## What to Do Next (Epic 5 — MilkApp polish)
 - File upload UI in MilkApp (payment proof screenshots, profile photos)
-- File upload UI in Admin Web (payment verification, document upload)
-- Presigned URL handling for direct uploads from frontend
-- Retailer filters (status, date range, area) on admin retailers page
+- Profile settings page in MilkApp (change password, edit profile)
+- Forgot password / reset password flow
+- Push notifications for order updates (Firebase / FCM)
 - Bulk operations (export to CSV, batch status updates)
 
-## Relevant Files & Paths (Epic 3 additions)
+## Relevant Files & Paths
 | Area | Path |
 |------|------|
-| Force logout endpoint | `apps/api/src/admin/admin.controller.ts` (line ~35) |
-| Force logout service method | `apps/api/src/admin/admin.service.ts` `forceLogout()` |
-| Force logout button (users page) | `apps/web/src/app/(app)/users/page.tsx` |
-| Unlinked users endpoint | `apps/api/src/admin/admin.controller.ts` |
-| Unlinked users service method | `apps/api/src/admin/admin.service.ts` `listUnlinkedUsers()` |
-| Link user endpoint | `apps/api/src/admin/admin.controller.ts` |
-| Link user service method | `apps/api/src/admin/admin.service.ts` `linkUser()` |
+| Force logout endpoint | `apps/api/src/admin/admin.controller.ts` |
 | Reconcile dialog | `apps/web/src/features/users/reconcile-dialog.tsx` |
-| Distributor edit endpoint | `apps/api/src/admin/admin.controller.ts` |
-| Distributor edit service method | `apps/api/src/admin/admin.service.ts` `updateDistributor()` |
 | Distributor edit dialog | `apps/web/src/features/network/distributor-edit-dialog.tsx` |
-| Payment filters (date range backend) | `apps/api/src/payment/payment.controller.ts` + `payment.service.ts` |
-| Sales visit filters (date, outletType backend) | `apps/api/src/sales-visit/sales-visit.controller.ts` + `sales-visit.service.ts` |
-| Distributor page filters | `apps/web/src/app/(app)/distributors/page.tsx` |
-| Payments page filters | `apps/web/src/app/(app)/payments/page.tsx` |
-| Sales visits page filters | `apps/web/src/app/(app)/sales-visits/page.tsx` |
-| Admin module imports AuthModule | `apps/api/src/admin/admin.module.ts` |
+| Presigned PUT endpoint | `apps/api/src/file/file.controller.ts` + `file.service.ts` |
+| Frontend file API client | `apps/web/src/lib/api.ts` (`files` section) |
+| Payment dialog with file picker | `apps/web/src/features/payments/payment-dialog.tsx` |
+| Retailer page with status/date filters | `apps/web/src/app/(app)/retailers/page.tsx` |
+| Distributor page with region/status filters | `apps/web/src/app/(app)/distributors/page.tsx` |
+| Payments page with distributor/date filters | `apps/web/src/app/(app)/payments/page.tsx` |
+| Sales visits page with filters | `apps/web/src/app/(app)/sales-visits/page.tsx` |
 
 ## Build & Run
 ```bash
@@ -89,3 +88,6 @@ All users have password `Moderns@2026` (bcrypt-hashed). Phone numbers in seed sc
 - Switch to `main` branch before starting new work
 - Force logout revokes ALL refresh tokens for that user via `TokenService.revokeAll()`
 - Linking a user to a distributor also revokes their tokens so JWT picks up new `distributorId`
+- File uploads go through NestJS proxy (POST /files/upload) for auth, OR use presigned PUT for direct-to-MinIO
+- Frontend file picker uses `<input type="file" accept="image/*">` and uploads via FormData
+- rawRequest() detects FormData and skips setting Content-Type header (browser sets multipart boundary)
