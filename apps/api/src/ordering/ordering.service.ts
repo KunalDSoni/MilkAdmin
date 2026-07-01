@@ -149,6 +149,8 @@ export class OrderingService {
         deliveryDate: window.deliveryDate,
         status: 'DRAFT',
         source: 'MANUAL',
+        // A distributor may tag the order as a self-order (spec §2.5-2.7).
+        orderType: user.role === 'DISTRIBUTOR' ? input.orderType : 'RETAILER',
         subtotal,
         taxTotal,
         total: subtotal.add(taxTotal),

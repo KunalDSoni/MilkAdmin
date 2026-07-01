@@ -126,6 +126,7 @@ export default function OrderDetailPage() {
         } · placed ${formatDateTime(order.createdAt)}`}
         actions={
           <div className="flex items-center gap-2">
+            {order.orderType === 'SELF' ? <Badge variant="info">Self-Order</Badge> : null}
             <OrderStatusBadge status={order.status} />
             {canReview && (
               <>

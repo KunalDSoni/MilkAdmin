@@ -154,6 +154,7 @@ export interface OrderDto {
   deliveryDate: string;
   status: OrderStatus;
   source: 'STANDING' | 'MANUAL';
+  orderType?: 'RETAILER' | 'SELF';
   approvalType: 'AUTO' | 'MANUAL' | null;
   approvedById: string | null;
   // Review metadata (spec §4.1.5).
