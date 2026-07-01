@@ -25,6 +25,8 @@ import type {
   OrderSummaryDto,
   OrderDeadlineDto,
   OrderDeadlineInput,
+  StandingOrderDto,
+  UpsertStandingOrderInput,
 } from '@moderns-milk/contracts';
 import { clearTokens, getTokens, setTokens } from './tokens';
 
@@ -289,6 +291,16 @@ export const api = {
       request<OutletLedgerDto>(`/customers/${retailerId}/ledger`, { signal }),
     collect: (input: RecordCollectionInput) =>
       request<OutletLedgerDto>('/collections', { method: 'POST', body: input }),
+  },
+  standingOrders: {
+    list: (signal?: AbortSignal) =>
+      request<StandingOrderDto[]>('/standing-orders', { signal }),
+    create: (input: UpsertStandingOrderInput) =>
+      request<StandingOrderDto>('/standing-orders', { method: 'POST', body: input }),
+    update: (id: string, input: UpsertStandingOrderInput) =>
+      request<StandingOrderDto>(`/standing-orders/${id}`, { method: 'PATCH', body: input }),
+    delete: (id: string) =>
+      request<void>(`/standing-orders/${id}`, { method: 'DELETE' }),
   },
 };
 
