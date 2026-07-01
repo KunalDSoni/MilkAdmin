@@ -18,6 +18,7 @@ import { SampleOrderModule } from './sample-order/sample-order.module';
 import { PaymentModule } from './payment/payment.module';
 import { ReportModule } from './report/report.module';
 import { SettingsModule } from './settings/settings.module';
+import { FileModule } from './file/file.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -25,6 +26,7 @@ import { HealthController } from './health.controller';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
+      envFilePath: ['.env', '../../.env'],
     }),
     CommonModule,
     AuthModule,
@@ -40,10 +42,10 @@ import { HealthController } from './health.controller';
     PaymentModule,
     ReportModule,
     SettingsModule,
+    FileModule,
   ],
   controllers: [HealthController],
   providers: [
-    // Auth runs first (populates request.user), then role checks.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
